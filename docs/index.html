@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Singing Flower Art</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌸</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+        #error-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+        }
+        #error-message.hidden {
+            display: none;
+        }
+        #demo-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+        #demo-toggle:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+        #demo-toggle.active {
+            background-color: rgba(100, 200, 100, 0.3);
+            border-color: rgba(100, 200, 100, 0.8);
+        }
+        #demo-controls {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 8px;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            min-width: 250px;
+            display: none;
+        }
+        #demo-controls.visible {
+            display: block;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        .control-value {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+        }
+        input[type="range"]:disabled::-webkit-slider-thumb {
+            cursor: not-allowed;
+            background: #888;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            border: none;
+        }
+        input[type="range"]:disabled::-moz-range-thumb {
+            cursor: not-allowed;
+            background: #888;
+        }
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .mode-button {
+            flex: 1;
+            padding: 8px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s ease;
+        }
+        .mode-button:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        .mode-button.active {
+            background-color: rgba(100, 200, 100, 0.3);
+            border-color: rgba(100, 200, 100, 0.8);
+        }
+    </style>
+  <script type="module" crossorigin src="/singing-flower/assets/index-CyUZumrt.js"></script>
+</head>
+<body>
+    <div id="error-message" class="hidden"></div>
+    
+    <div id="demo-controls">
+        <div class="mode-toggle">
+            <button class="mode-button active" data-mode="auto">自動変化</button>
+            <button class="mode-button" data-mode="manual">手動設定</button>
+        </div>
+        
+        <div class="control-group">
+            <div class="control-label">
+                <span>音量 (Volume)</span>
+                <span class="control-value" id="volume-value">20</span>
+            </div>
+            <input type="range" id="volume-slider" min="0" max="100" value="20" step="1" disabled>
+        </div>
+        
+        <div class="control-group">
+            <div class="control-label">
+                <span>ピッチ (Pitch)</span>
+                <span class="control-value" id="pitch-value">400 Hz</span>
+            </div>
+            <input type="range" id="pitch-slider" min="200" max="800" value="400" step="10" disabled>
+        </div>
+    </div>
+    
+    <button id="demo-toggle">デモモード: OFF</button>
+    
+</body>
+</html>
