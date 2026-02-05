@@ -1,13 +1,9 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  base: '/singing-flower/',
   build: {
-    outDir: 'dist',
-    rollupOptions: {
-      input: {
-        main: './src/main.ts'
-      }
-    }
+    outDir: 'dist'
   },
   test: {
     globals: true,

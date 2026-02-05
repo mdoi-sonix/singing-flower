@@ -524,8 +524,7 @@ const sketch = (p: p5) => {
         leaves: state.leaves,
         particles: state.particles,
         ripples: state.ripples,
-        reduceGlow: reduceGlow, // グロー制御フラグを追加
-        debugRawVolume: debugRawVolume // デバッグ用
+        reduceGlow: reduceGlow // グロー制御フラグを追加
       };
       
       renderer.render(state.growthState, params, time);
@@ -969,9 +968,12 @@ const sketch = (p: p5) => {
       
       // 収束完了判定（SCATTER状態のパーティクルが全て消滅したら、またはタイムアウト）
       const convergeAge = state.convergeStartTime ? (time - state.convergeStartTime) / 1000 : 0;
-      const convergeTimeout = 10; // 最大10秒で収束完了（5秒→10秒に延長）
+      const convergeTimeout = 12; // 最大12秒で収束完了（種子が完全に現れてから余裕を持たせる）
       
-      if (state.convergeStartTime && (scatterParticleCount === 0 || convergeAge > convergeTimeout)) {
+      // 種子が完全に現れてから（5秒後）、さらに1秒待ってから遷移
+      const seedFullyVisible = convergeAge >= 6;
+      
+      if (state.convergeStartTime && seedFullyVisible && (scatterParticleCount === 0 || convergeAge > convergeTimeout)) {
         // 収束完了：SEED状態に移行（種子はそのまま、鳴動開始）
         state.growthState = GrowthState.SEED;
         state.scatterStartTime = undefined;
@@ -1047,19 +1049,21 @@ const sketch = (p: p5) => {
           leaf.unfurlProgress = Math.min(1, leafAge / totalDuration);
         }
         
-        // 波紋を生成（SCATTER状態でも継続）
+        // 波紋を生成（ワイプ完了前のみ）
         const seedPos = renderer.getSeedPosition();
         
-        // 1. 音量が高い時に地面から広がる（強い波紋）
-        if (volume > 35 && Math.random() < 0.1) {
-          const newRipple = renderer.generateRipple(seedPos.x, seedPos.y, volume, time);
-          state.ripples.push(newRipple);
-        }
-        // 2. 音がない時も時々アンビエント波紋（弱い波紋、地面感を出す）
-        else if (Math.random() < 0.02) {
-          const ambientVolume = 20 + Math.random() * 20;
-          const newRipple = renderer.generateRipple(seedPos.x, seedPos.y, ambientVolume, time);
-          state.ripples.push(newRipple);
+        if (!wipeCompleted) {
+          // 1. 音量が高い時に地面から広がる（強い波紋）
+          if (volume > 35 && Math.random() < 0.1) {
+            const newRipple = renderer.generateRipple(seedPos.x, seedPos.y, volume, time);
+            state.ripples.push(newRipple);
+          }
+          // 2. 音がない時も時々アンビエント波紋（弱い波紋、地面感を出す）
+          else if (Math.random() < 0.02) {
+            const ambientVolume = 20 + Math.random() * 20;
+            const newRipple = renderer.generateRipple(seedPos.x, seedPos.y, ambientVolume, time);
+            state.ripples.push(newRipple);
+          }
         }
         
         // 波紋を更新
@@ -1069,12 +1073,21 @@ const sketch = (p: p5) => {
         let seedAlpha = 0;
         let rippleAlphaMultiplier = 1.0; // 波紋の透明度係数（デフォルトは1.0）
         
+        // ワイプ完了後から波紋を徐々に消す
+        if (wipeCompleted) {
+          // ワイプ完了時点から3秒かけて波紋を消す
+          const fadeOutDuration = 3;
+          const fadeOutProgress = Math.min(1, convergeAge / fadeOutDuration);
+          rippleAlphaMultiplier = Math.max(0, 1.0 - fadeOutProgress);
+        }
+        
         if (state.convergeStartTime) {
-          const convergeProgress = Math.min(1, convergeAge / 3); // 3秒かけて種子が現れる
-          seedAlpha = convergeProgress;
-          
-          // 収束開始後、波紋を徐々に薄くする（3秒かけて1.0→0.0）
-          rippleAlphaMultiplier = Math.max(0, 1.0 - convergeProgress);
+          const convergeProgress = Math.min(1, convergeAge / 5); // 5秒かけて種子が現れる（3秒→5秒）
+          // イージング関数を適用（ease-in-out）
+          const eased = convergeProgress < 0.5
+            ? 2 * convergeProgress * convergeProgress
+            : 1 - Math.pow(-2 * convergeProgress + 2, 2) / 2;
+          seedAlpha = eased;
         }
         
         // SCATTER状態の描画（アニメーション付き）

@@ -15,7 +15,7 @@ export class ParticleSystem {
   private gravity: number = 0.5; // 重力加速度
   private alphaDecayRate: number = 0.3; // 透明度減少率（1秒あたり）
   private alphaThreshold: number = 0.3; // 収束段階への遷移閾値
-  private convergenceSpeed: number = 2.0; // 収束速度の基本倍率
+  private convergenceSpeed: number = 4.0; // 収束速度の基本倍率（2.0→4.0に増加）
   private arrivalThreshold: number = 5; // 到達判定の距離閾値（ピクセル）
   
   constructor(seedPosition: Point) {
@@ -197,8 +197,10 @@ export class ParticleSystem {
       const distance = Math.sqrt(dx * dx + dy * dy);
       
       if (distance > this.arrivalThreshold) {
-        // 距離に応じた速度増加（遠いほど速く）
-        const speedMultiplier = 1 + (distance / 100);
+        // 距離に応じた速度増加（遠いほど速く）+ イージング
+        const distanceRatio = Math.min(distance / 300, 1); // 正規化（300px以上は1.0）
+        const easing = 1 - Math.pow(1 - distanceRatio, 3); // ease-out cubic
+        const speedMultiplier = 1 + (easing * 3); // 最大4倍速
         const speed = this.convergenceSpeed * speedMultiplier;
         
         // 正規化された方向ベクトル
@@ -219,8 +221,11 @@ export class ParticleSystem {
         particle.vy = 0;
       }
       
-      // 透明度を徐々に回復
-      particle.alpha += 0.5 * deltaTime;
+      // 透明度を徐々に回復（遅めに）
+      // 種子に近づくほど透明度が上がる
+      const distanceToSeed = Math.sqrt(dx * dx + dy * dy);
+      const proximityRatio = Math.max(0, 1 - distanceToSeed / 200); // 200px以内で徐々に見える
+      particle.alpha += 0.3 * deltaTime * proximityRatio; // 近づくほど速く回復
       particle.alpha = Math.min(1, particle.alpha);
     }
   }
