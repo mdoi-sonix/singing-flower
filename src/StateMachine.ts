@@ -7,7 +7,7 @@ const THRESHOLDS = {
   // 音量閾値（デシベル）
   SEED_TO_SPROUT_VOLUME: 30,      // 種子→芽
   BLOOM_TO_SCATTER_VOLUME: 70,    // 開花→散る
-  
+
   // 成長進行度閾値（ピクセル）
   SPROUT_TO_STEM_LENGTH: 100,     // 芽→茎と葉
   STEM_TO_BLOOM_LENGTH: 300,      // 茎と葉→開花

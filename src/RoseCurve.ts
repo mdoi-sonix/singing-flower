@@ -13,25 +13,25 @@ export class RoseCurve {
    */
   public calculateCurve(a: number, k: number, segments: number = 360): Array<{r: number, theta: number}> {
     const points: Array<{r: number, theta: number}> = [];
-    
+
     // θを0から2πまで（kが整数の場合）または4πまで（kが分数の場合）回す
     const maxTheta = this.getMaxTheta(k);
     const step = maxTheta / segments;
-    
+
     for (let i = 0; i <= segments; i++) {
       const theta = i * step;
       const r = a * Math.cos(k * theta);
-      
+
       // rが負の場合は反対方向に描画（極座標の性質）
       points.push({
         r: Math.abs(r),
         theta: r < 0 ? theta + Math.PI : theta
       });
     }
-    
+
     return points;
   }
-  
+
   /**
    * 指定された角度でのバラ曲線の半径を計算
    * @param theta 角度（ラジアン）
@@ -43,7 +43,7 @@ export class RoseCurve {
     const r = a * Math.cos(k * theta);
     return Math.abs(r);
   }
-  
+
   /**
    * 極座標から直交座標に変換
    * @param r 半径
@@ -58,7 +58,7 @@ export class RoseCurve {
       y: centerY + r * Math.sin(theta)
     };
   }
-  
+
   /**
    * 直交座標から極座標に変換（テスト用）
    * @param x X座標
@@ -70,13 +70,13 @@ export class RoseCurve {
   public cartesianToPolar(x: number, y: number, centerX: number = 0, centerY: number = 0): {r: number, theta: number} {
     const dx = x - centerX;
     const dy = y - centerY;
-    
+
     return {
       r: Math.sqrt(dx * dx + dy * dy),
       theta: Math.atan2(dy, dx)
     };
   }
-  
+
   /**
    * k値に応じた最大θを計算
    * kが整数の場合は2π、分数の場合は分母に応じて調整
@@ -86,7 +86,7 @@ export class RoseCurve {
   private getMaxTheta(k: number): number {
     // kが整数かどうかを判定（小数点以下が0.01未満）
     const isInteger = Math.abs(k - Math.round(k)) < 0.01;
-    
+
     if (isInteger) {
       // kが偶数の場合は2π、奇数の場合は2π
       return 2 * Math.PI;
@@ -95,7 +95,7 @@ export class RoseCurve {
       return 4 * Math.PI;
     }
   }
-  
+
   /**
    * 音高に応じたk値を計算
    * 高い声でk値を増やす（花びらが細かく増える）
@@ -116,7 +116,7 @@ export class RoseCurve {
   ): number {
     // 音高を0-1の範囲に正規化
     const normalizedPitch = Math.max(0, Math.min(1, (pitch - minPitch) / (maxPitch - minPitch)));
-    
+
     // k値を線形補間
     return minK + normalizedPitch * (maxK - minK);
   }

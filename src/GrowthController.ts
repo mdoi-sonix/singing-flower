@@ -34,11 +34,11 @@ export class GrowthController {
   private calculateGrowthSpeed(volume: number): number {
     // 音量を0-1に正規化
     const normalizedVolume = volume / 100;
-    
+
     // イージング関数を適用（スムーズステップ）
     // より滑らかな加速・減速を実現
     const easedVolume = normalizedVolume * normalizedVolume * (3 - 2 * normalizedVolume);
-    
+
     // growthSpeed = 1 + easedVolume * 2
     // 音量0で1.0倍、音量100で3.0倍（イージング適用）
     return 1 + easedVolume * 2;
@@ -66,7 +66,7 @@ export class GrowthController {
     // 低い音（200Hz）→ 緑（120°）
     // 中間（300Hz）→ 緑-シアン（150°）
     // 高い音（400Hz以上）→ シアン（180°）
-    
+
     if (pitch <= 200) {
       return 120; // 緑
     } else if (pitch >= 400) {
@@ -106,7 +106,7 @@ export class GrowthController {
     // 音高が高いほど明るい色になる
     // 下限30%、上限は計算結果（例: 400Hzで70%）
     const lightness = 30 + pitch / 10;
-    
+
     // 30-70%の範囲に制限
     return Math.max(30, Math.min(70, lightness));
   }

@@ -30,13 +30,13 @@ describe('Renderer', () => {
     canvas = document.createElement('canvas');
     canvas.width = 800;
     canvas.height = 600;
-    
+
     // モックコンテキストを作成
     mockContext = createMockContext();
-    
+
     // getContextをモック化
     vi.spyOn(canvas, 'getContext').mockReturnValue(mockContext as any);
-    
+
     renderer = new Renderer(canvas);
   });
 
@@ -63,7 +63,7 @@ describe('Renderer', () => {
       const newCanvas = document.createElement('canvas');
       newCanvas.width = 1024;
       newCanvas.height = 768;
-      
+
       const newMockContext = createMockContext();
       vi.spyOn(newCanvas, 'getContext').mockReturnValue(newMockContext as any);
 
@@ -102,7 +102,7 @@ describe('Renderer', () => {
 
       expect(mockContext.createRadialGradient).toHaveBeenCalled();
       const calls = mockContext.createRadialGradient.mock.calls[0];
-      
+
       // 中心座標が正しいか確認
       expect(calls[0]).toBe(400); // centerX
       expect(calls[1]).toBe(300); // centerY
@@ -192,7 +192,7 @@ describe('Renderer', () => {
 
       const baseRadius = 8;
       const arcCall = mockContext.arc.mock.calls[0];
-      
+
       // 時間0では sin(0) = 0 なので基本サイズ
       expect(arcCall[2]).toBeCloseTo(baseRadius, 5);
     });
@@ -204,7 +204,7 @@ describe('Renderer', () => {
       const baseRadius = 8;
       const pulseAmplitude = 3;
       const arcCall = mockContext.arc.mock.calls[0];
-      
+
       // 時間500msでは sin(π/2) = 1 なので最大サイズ
       expect(arcCall[2]).toBeCloseTo(baseRadius + pulseAmplitude, 5);
     });
@@ -216,7 +216,7 @@ describe('Renderer', () => {
       const baseRadius = 8;
       const pulseAmplitude = 3;
       const arcCall = mockContext.arc.mock.calls[0];
-      
+
       // 時間1500msでは sin(3π/2) = -1 なので最小サイズ
       expect(arcCall[2]).toBeCloseTo(baseRadius - pulseAmplitude, 5);
     });
@@ -227,14 +227,14 @@ describe('Renderer', () => {
 
       const baseRadius = 8;
       const arcCall = mockContext.arc.mock.calls[0];
-      
+
       // 時間2000msでは sin(2π) = 0 なので基本サイズに戻る
       expect(arcCall[2]).toBeCloseTo(baseRadius, 5);
     });
 
     it('getSeedPositionが正しい位置を返す', () => {
       const position = renderer.getSeedPosition();
-      
+
       expect(position.x).toBe(400); // width / 2
       expect(position.y).toBe(450); // height * 0.75
     });
@@ -261,7 +261,7 @@ describe('Renderer', () => {
 
       // arcメソッドが呼ばれることを確認（種子の描画）
       expect(mockContext.arc).toHaveBeenCalled();
-      
+
       // 位置が正しいことを確認
       const arcCall = mockContext.arc.mock.calls[0];
       expect(arcCall[0]).toBe(400); // x
@@ -376,7 +376,7 @@ describe('Renderer - Property-Based Tests', () => {
   describe('Feature: singing-flower-art, Property 18: ウィンドウサイズに応じたCanvas調整', () => {
     /**
      * **Validates: Requirements 10.1, 10.3**
-     * 
+     *
      * プロパティ18: ウィンドウサイズに応じたCanvas調整
      * 任意のウィンドウサイズに対して、RendererはCanvasのサイズを調整し、
      * 描画要素の位置とサイズを相対値で計算する
@@ -414,7 +414,7 @@ describe('Renderer - Property-Based Tests', () => {
             renderer.drawBackground();
             const gradientCalls = testMockContext.createRadialGradient.mock.calls;
             const lastCall = gradientCalls[gradientCalls.length - 1];
-            
+
             // 中心座標が画面中央であることを確認
             expect(lastCall[0]).toBe(width / 2);  // centerX
             expect(lastCall[1]).toBe(height / 2); // centerY
@@ -505,7 +505,7 @@ describe('Renderer - Property-Based Tests', () => {
   describe('Feature: singing-flower-art, Property 7: 種子の脈動アニメーション', () => {
     /**
      * **Validates: Requirements 2.3**
-     * 
+     *
      * プロパティ7: 種子の脈動アニメーション
      * 任意の時間経過に対して、種子状態のRendererは円のサイズを周期的に変化させる
      */
@@ -574,7 +574,7 @@ describe('Renderer - Property-Based Tests', () => {
 
             // 1周期の開始時刻
             const startTime = cycleCount * pulsePeriod;
-            
+
             // 周期の開始時（sin(0) = 0）
             renderer.drawSeed(startTime);
             const startRadius = testMockContext.arc.mock.calls[0][2];

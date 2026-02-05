@@ -12,7 +12,7 @@ describe('GrowthController', () => {
   describe('基本機能', () => {
     it('updateメソッドが成長パラメータを返す', () => {
       const params = controller.update(50, 300, 0.016);
-      
+
       expect(params).toHaveProperty('growthSpeed');
       expect(params).toHaveProperty('swayAmount');
       expect(params).toHaveProperty('colorHue');
@@ -90,7 +90,7 @@ describe('GrowthController - Property-Based Tests', () => {
   describe('Feature: singing-flower-art, Property 4: 音量による成長速度の変化', () => {
     /**
      * **Validates: Requirements 3.2, 4.2, 4.4**
-     * 
+     *
      * プロパティ4: 音量による成長速度の変化
      * 任意の音量値に対して、GrowthControllerは音量が大きいほど
      * 成長速度（茎の伸び、葉の生成速度）を増加させる
@@ -134,7 +134,7 @@ describe('GrowthController - Property-Based Tests', () => {
   describe('Feature: singing-flower-art, Property 5: 音高による色の変化', () => {
     /**
      * **Validates: Requirements 3.3, 4.5, 5.6**
-     * 
+     *
      * プロパティ5: 音高による色の変化
      * 任意の音高値に対して、Rendererは音高が高いほど明るい色、
      * 低いほど深い色を適用する（芽、茎と葉、花）
@@ -184,7 +184,7 @@ describe('GrowthController - Property-Based Tests', () => {
   describe('Feature: singing-flower-art, Property 6: 音高変化による揺れ', () => {
     /**
      * **Validates: Requirements 3.4, 4.6**
-     * 
+     *
      * プロパティ6: 音高変化による揺れ
      * 任意の音高変化に対して、Rendererは揺れの振幅を変化させる
      * （芽、茎と葉、花びら）

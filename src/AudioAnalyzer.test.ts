@@ -7,7 +7,7 @@ describe('AudioAnalyzer', () => {
     /**
      * Feature: singing-flower-art, Property 1: 音声データの継続的な取得
      * Validates: Requirements 1.2, 1.3, 1.4
-     * 
+     *
      * 任意のマイクアクセス許可後、Audio_Analyzerは音声データを継続的に取得し、
      * 音量と音高を計算する
      */

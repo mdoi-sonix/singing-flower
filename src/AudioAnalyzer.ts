@@ -15,7 +15,7 @@ export class AudioAnalyzer {
   async initialize(): Promise<void> {
     try {
       console.log('[AudioAnalyzer] 初期化開始...');
-      
+
       // 既存のリソースをクリーンアップ（再初期化の場合）
       if (this.active) {
         console.log('[AudioAnalyzer] 既存のリソースをクリーンアップ中...');
@@ -23,7 +23,7 @@ export class AudioAnalyzer {
         // disposeの完了を待つ
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-      
+
       // Web Audio APIのサポートチェック
       if (!window.AudioContext && !(window as any).webkitAudioContext) {
         throw new Error('Web Audio APIがサポートされていません');
@@ -35,22 +35,22 @@ export class AudioAnalyzer {
 
       // マイクアクセスの取得
       console.log('[AudioAnalyzer] マイクアクセス要求中...');
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false
-        } 
+        }
       });
       console.log('[AudioAnalyzer] マイクアクセス許可されました');
-      
+
       // 使用中のマイクデバイス情報を表示
       const audioTracks = this.mediaStream.getAudioTracks();
       if (audioTracks.length > 0) {
         const track = audioTracks[0];
         console.log('[AudioAnalyzer] 使用中のマイク:', track.label);
         console.log('[AudioAnalyzer] マイク設定:', track.getSettings());
-        
+
         // トラックが停止された時のイベントリスナーを追加
         track.addEventListener('ended', () => {
           console.warn('[AudioAnalyzer] マイクトラックが停止されました（ブラウザ設定で許可解除された可能性）');
@@ -74,10 +74,10 @@ export class AudioAnalyzer {
       this.microphone = this.audioContext.createMediaStreamSource(this.mediaStream);
       this.microphone.connect(this.analyserNode);
       console.log('[AudioAnalyzer] マイク接続完了');
-      
+
       // AudioContextの状態を確認
       console.log('[AudioAnalyzer] AudioContext状態:', this.audioContext.state);
-      
+
       // AudioContextがsuspendedの場合は再開
       if (this.audioContext.state === 'suspended') {
         console.log('[AudioAnalyzer] AudioContextを再開中...');
@@ -113,7 +113,7 @@ export class AudioAnalyzer {
       console.warn('[AudioAnalyzer] Not active or not initialized');
       return 0;
     }
-    
+
     // AudioContextの状態を確認
     if (this.audioContext && this.audioContext.state === 'suspended') {
       console.warn('[AudioAnalyzer] AudioContext is suspended, attempting to resume...');
@@ -143,7 +143,7 @@ export class AudioAnalyzer {
     const db = 20 * Math.log10(rms + 0.0001);
     // -60dB〜0dBを0〜100にマッピング（感度を上げるため範囲を調整）
     const volume = Math.max(0, Math.min(100, (db + 60) * (100 / 60)));
-    
+
     // 感度を適度に上げるため、音量を増幅（2.0倍に減少）
     const amplifiedVolume = Math.min(100, volume * 2.0);
 
@@ -240,9 +240,9 @@ export class AudioAnalyzer {
    */
   dispose(): void {
     console.log('[AudioAnalyzer] リソース解放開始...');
-    
+
     this.active = false; // 先にフラグを下ろす
-    
+
     // マイクストリームを停止
     if (this.mediaStream) {
       const tracks = this.mediaStream.getTracks();
@@ -253,7 +253,7 @@ export class AudioAnalyzer {
       });
       this.mediaStream = null;
     }
-    
+
     // マイクノードを切断
     if (this.microphone) {
       try {
@@ -280,7 +280,7 @@ export class AudioAnalyzer {
     if (this.audioContext) {
       const state = this.audioContext.state;
       console.log('[AudioAnalyzer] AudioContext状態:', state);
-      
+
       if (state !== 'closed') {
         this.audioContext.close().then(() => {
           console.log('[AudioAnalyzer] AudioContext閉じました');
@@ -292,7 +292,7 @@ export class AudioAnalyzer {
     }
 
     this.dataArray = null;
-    
+
     console.log('[AudioAnalyzer] リソース解放完了');
   }
 }

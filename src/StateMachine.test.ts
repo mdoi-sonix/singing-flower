@@ -8,7 +8,7 @@ describe('StateMachine', () => {
     /**
      * Feature: singing-flower-art, Property 2: 音量による状態遷移
      * Validates: Requirements 2.4, 5.8
-     * 
+     *
      * 任意の音量値に対して、閾値を超えた場合、State_Machineは適切な次の状態へ遷移する
      * （種子→芽、開花→散る）
      */
@@ -20,9 +20,9 @@ describe('StateMachine', () => {
             // 種子→芽の遷移をテスト
             const stateMachine1 = new StateMachine();
             expect(stateMachine1.getCurrentState()).toBe(GrowthState.SEED);
-            
+
             stateMachine1.update(volume, 0);
-            
+
             if (volume >= 30) {
               // 音量が閾値以上なら芽状態に遷移
               if (stateMachine1.getCurrentState() !== GrowthState.SPROUT) {
@@ -42,9 +42,9 @@ describe('StateMachine', () => {
             stateMachine2.update(30, 100); // SPROUT -> STEM
             stateMachine2.update(30, 300); // STEM -> BLOOM
             expect(stateMachine2.getCurrentState()).toBe(GrowthState.BLOOM);
-            
+
             stateMachine2.update(volume, 300);
-            
+
             if (volume >= 70) {
               // 音量が散る閾値以上なら散る状態に遷移
               if (stateMachine2.getCurrentState() !== GrowthState.SCATTER) {
@@ -67,7 +67,7 @@ describe('StateMachine', () => {
     /**
      * Feature: singing-flower-art, Property 3: 成長進行による状態遷移
      * Validates: Requirements 3.5, 4.13
-     * 
+     *
      * 任意の成長進行度に対して、閾値に達した場合、State_Machineは適切な次の状態へ遷移する
      * （芽→茎と葉、茎と葉→開花）
      */
@@ -81,9 +81,9 @@ describe('StateMachine', () => {
             // 芽状態まで進める
             stateMachine1.update(30, 0);
             expect(stateMachine1.getCurrentState()).toBe(GrowthState.SPROUT);
-            
+
             stateMachine1.update(30, growthProgress);
-            
+
             if (growthProgress >= 100) {
               // 成長進行度が閾値以上なら茎と葉状態に遷移
               if (stateMachine1.getCurrentState() !== GrowthState.STEM) {
@@ -102,9 +102,9 @@ describe('StateMachine', () => {
             stateMachine2.update(30, 0);   // SEED -> SPROUT
             stateMachine2.update(30, 100); // SPROUT -> STEM
             expect(stateMachine2.getCurrentState()).toBe(GrowthState.STEM);
-            
+
             stateMachine2.update(30, growthProgress);
-            
+
             if (growthProgress >= 300) {
               // 成長進行度が閾値以上なら開花状態に遷移
               if (stateMachine2.getCurrentState() !== GrowthState.BLOOM) {
@@ -138,17 +138,17 @@ describe('StateMachine', () => {
 
     it('transitions from SEED to SPROUT when volume exceeds threshold', () => {
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SEED);
-      
+
       stateMachine.update(30, 0);
-      
+
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SPROUT);
     });
 
     it('stays in SEED state when volume is below threshold', () => {
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SEED);
-      
+
       stateMachine.update(29, 0);
-      
+
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SEED);
     });
 
@@ -156,9 +156,9 @@ describe('StateMachine', () => {
       // 芽状態まで進める
       stateMachine.update(30, 0);
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SPROUT);
-      
+
       stateMachine.update(30, 100);
-      
+
       expect(stateMachine.getCurrentState()).toBe(GrowthState.STEM);
     });
 
@@ -166,9 +166,9 @@ describe('StateMachine', () => {
       // 芽状態まで進める
       stateMachine.update(30, 0);
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SPROUT);
-      
+
       stateMachine.update(30, 99);
-      
+
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SPROUT);
     });
 
@@ -177,9 +177,9 @@ describe('StateMachine', () => {
       stateMachine.update(30, 0);
       stateMachine.update(30, 100);
       expect(stateMachine.getCurrentState()).toBe(GrowthState.STEM);
-      
+
       stateMachine.update(30, 300);
-      
+
       expect(stateMachine.getCurrentState()).toBe(GrowthState.BLOOM);
     });
 
@@ -188,9 +188,9 @@ describe('StateMachine', () => {
       stateMachine.update(30, 0);
       stateMachine.update(30, 100);
       expect(stateMachine.getCurrentState()).toBe(GrowthState.STEM);
-      
+
       stateMachine.update(30, 299);
-      
+
       expect(stateMachine.getCurrentState()).toBe(GrowthState.STEM);
     });
 
@@ -200,9 +200,9 @@ describe('StateMachine', () => {
       stateMachine.update(30, 100);
       stateMachine.update(30, 300);
       expect(stateMachine.getCurrentState()).toBe(GrowthState.BLOOM);
-      
+
       stateMachine.update(70, 300);
-      
+
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SCATTER);
     });
 
@@ -212,9 +212,9 @@ describe('StateMachine', () => {
       stateMachine.update(30, 100);
       stateMachine.update(30, 300);
       expect(stateMachine.getCurrentState()).toBe(GrowthState.BLOOM);
-      
+
       stateMachine.update(69, 300);
-      
+
       expect(stateMachine.getCurrentState()).toBe(GrowthState.BLOOM);
     });
 
@@ -225,9 +225,9 @@ describe('StateMachine', () => {
       stateMachine.update(30, 300);
       stateMachine.update(70, 300);
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SCATTER);
-      
+
       stateMachine.reset();
-      
+
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SEED);
     });
 
@@ -238,10 +238,10 @@ describe('StateMachine', () => {
       stateMachine.update(30, 300);
       stateMachine.update(70, 300);
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SCATTER);
-      
+
       // updateを呼んでも散る状態のまま
       stateMachine.update(0, 0);
-      
+
       expect(stateMachine.getCurrentState()).toBe(GrowthState.SCATTER);
     });
   });
