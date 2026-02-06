@@ -42,8 +42,8 @@ export class ParticleSystem {
     this.particles = [];
     this.phase = 'scatter';
 
-    // 音量に応じた初速度（0-100 → 2-10 px/frame）
-    const baseSpeed = 2 + (volume / 100) * 8;
+    // 音量に応じた初速度（0-100 → 1-5 px/frame）画面内に収まるように制限
+    const baseSpeed = 1 + (volume / 100) * 4;
 
     // 音高に応じた移動方向の偏り（-1 to 1）
     // 低音: 下方向、高音: 上方向

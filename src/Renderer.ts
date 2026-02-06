@@ -179,7 +179,7 @@ export class Renderer {
 
     // 1. グロー効果（加算合成）
     this.p.blendMode(this.p.ADD);
-    const glowLayers = 8;
+    const glowLayers = 4; // 8→4に減らして軽量化
 
     for (let glowLayer = 0; glowLayer < glowLayers; glowLayer++) {
       const layerT = glowLayer / glowLayers;
@@ -702,12 +702,12 @@ export class Renderer {
 
     // 1. グロー効果（加算合成で大きなぼんやりとした光）
     canvas.blendMode(canvas.ADD);
-    const glowLayers = 60; // 40→60層に増やしてより滑らかに
+    const glowLayers = 20; // 60→20に減らして軽量化
 
     for (let i = 0; i < glowLayers; i++) {
       const t = i / glowLayers;
       const glowRadius = radius * (1.5 + t * 4); // 1.5倍から5.5倍まで
-      const glowAlpha = (1 - t * t * t) * brightness * 10 * fadeOut; // 15→10に下げて滑らかに
+      const glowAlpha = (1 - t * t * t) * brightness * 15 * fadeOut; // 10→15に上げて明るく
 
       // 外側は赤紫、内側はオレンジ
       const r = this.lerp(100, 240, 1 - t * 0.6); // 赤紫～オレンジ
@@ -720,11 +720,11 @@ export class Renderer {
 
     // 2. 本体（加算合成で滑らかに）
     // 本体も加算合成にして、輪郭をぼかす
-    const bodyLayers = 20; // 10→20層に増やして滑らかに
+    const bodyLayers = 10; // 20→10層に減らして軽量化
     for (let i = 0; i < bodyLayers; i++) {
       const t = i / bodyLayers;
       const bodyRadius = radius * (0.2 + t * 2.8); // 0.2倍から3倍まで
-      const bodyAlpha = (1 - t * t) * brightness * 15 * fadeOut; // 30→15に下げて滑らかに
+      const bodyAlpha = (1 - t * t) * brightness * 25 * fadeOut; // 15→25に上げて明るく
 
       // 内側から外側へのグラデーション（白→黄色→オレンジ）
       // t < 0.3: 白
@@ -754,6 +754,32 @@ export class Renderer {
       canvas.circle(seedX, seedY, bodyRadius);
     }
 
+    // 3. 中心のコア（通常合成で明確な形を作る）
+    canvas.blendMode(canvas.BLEND);
+    const coreRadius = radius * 0.8;
+    const coreAlpha = brightness * 180 * fadeOut;
+
+    // コアのグラデーション（中心が明るい黄色、外側がオレンジ）
+    const coreGradientLayers = 5;
+    for (let i = 0; i < coreGradientLayers; i++) {
+      const t = i / coreGradientLayers;
+      const layerRadius = coreRadius * (0.3 + t * 0.7);
+      const layerAlpha = coreAlpha * (1 - t * 0.5);
+
+      const r = this.lerp(255, 240, t);
+      const g = this.lerp(240, 150, t);
+      const b = this.lerp(150, 50, t);
+
+      canvas.fill(r, g, b, layerAlpha);
+      canvas.circle(seedX, seedY, layerRadius);
+    }
+
+    // 4. 輪郭線（存在感を強調）
+    canvas.noFill();
+    canvas.stroke(200, 100, 30, brightness * 100 * fadeOut);
+    canvas.strokeWeight(1.5);
+    canvas.circle(seedX, seedY, coreRadius);
+
     canvas.blendMode(canvas.BLEND);
   }
 
@@ -775,7 +801,7 @@ export class Renderer {
    * @param leaves 葉の配列（オプション）
    * @param time 現在時刻（オプション）
    */
-  public drawSprout(canvas: p5 | p5.Graphics, progress: number, volume: number, pitch: number, pitchChange: number, reduceGlow: boolean = false, stemHeight?: number, leaves?: Leaf[], time?: number): void {
+  public drawSprout(canvas: p5 | p5.Graphics, progress: number, volume: number, pitch: number, pitchChange: number, reduceGlow: boolean = false, stemHeight?: number, leaves?: Leaf[], time?: number, witherAmount: number = 0): void {
     const seedPos = this.getSeedPosition();
 
     // 長さの計算
@@ -792,14 +818,30 @@ export class Renderer {
     const normalizedPitch = this.constrain((pitch - 200) / 600, 0, 1);
 
     // 音高の変化に応じた揺れ
-    const swayAmount = pitchChange * 0.5;
+    let swayAmount = pitchChange * 0.5;
+    
+    // 常に風の揺れを追加（音量に応じて強さが変わる）
+    if (volume < 20) {
+      // 音量0-19の範囲で、微妙な風の揺れ
+      const lowVolumeFactor = volume / 20; // 0-1
+      const windSway = Math.sin((time || this.p.millis()) / 800) * 8 * lowVolumeFactor; // ±8の揺れ
+      swayAmount += windSway;
+    } else {
+      // 音量20以上でも風の揺れを追加（より強く）
+      const highVolumeFactor = Math.min(volume / 100, 1); // 0-1
+      const windSway = Math.sin((time || this.p.millis()) / 800) * 12 * highVolumeFactor; // ±12の揺れ
+      swayAmount += windSway;
+    }
 
     // 音量に応じたうねり
     const volumeFactor = volume / 100;
     const undulationAmount = volumeFactor * 30;
 
-    // フックの強度
+    // フックの強度（初期成長時のみ）
     const hookStrength = Math.max(0, 1 - progress / 0.8);
+
+    // 萎れによるU字型の曲がり（witherAmountが0-1）
+    const witherStrength = witherAmount;
 
     // 画面の向きを判定
     const isPortrait = canvas.height > canvas.width;
@@ -815,7 +857,7 @@ export class Renderer {
       const t = i / segments;
       const currentLength = length * t;
 
-      // フック状の曲がり
+      // フック状の曲がり（初期成長時）
       let offsetX = 0;
       let offsetY = 0;
 
@@ -833,6 +875,25 @@ export class Renderer {
           const liftCurve = liftT * liftT * liftT * (liftT * (liftT * 6 - 15) + 10);
           offsetY = -liftCurve * this.p.height * hookVertical * hookStrength;
         }
+      }
+
+      // 萎れによる曲がり（根元から徐々に曲がり、先端が下を向く）
+      if (witherStrength > 0) {
+        // シンプルな曲線：根元はまっすぐ、徐々に横に曲がり、先端が下を向く
+        
+        // 横方向の曲がり（三次関数で徐々に曲がる）
+        const witherHorizontal = isPortrait ? 0.08 : 0.1; // 横方向の最大曲がり幅（控えめに）
+        const curveX = t * t * t; // 三次関数で先端ほど曲がる
+        const witherOffsetX = curveX * this.p.height * witherHorizontal * witherStrength;
+        
+        // 下方向の垂れ（先端部分だけ下に垂れる）
+        const witherVertical = isPortrait ? 0.05 : 0.06; // 下方向の最大垂れ幅（控えめに）
+        // 先端に近づくほど下に垂れる（二次関数）
+        const dropCurve = t * t; // 先端ほど大きく垂れる
+        const witherOffsetY = dropCurve * this.p.height * witherVertical * witherStrength;
+        
+        offsetX += witherOffsetX;
+        offsetY += witherOffsetY;
       }
 
       const swayInfluence = t;
@@ -929,27 +990,36 @@ export class Renderer {
 
     canvas.noStroke();
 
-    // 葉を描画
+    // 葉を描画（茎の曲線に沿って配置）
     if (leaves && leaves.length > 0 && time !== undefined) {
       for (let i = 0; i < leaves.length; i++) {
         const leaf = leaves[i];
-        const leafHeight = seedPos.y - leaf.y;
+        
+        // 葉が茎上のどの位置にいるかは生成時に固定された相対位置を使用
+        const t = leaf.stemPositionRatio || 0;
 
-        const t = leafHeight / length;
-        const swayInfluence = t;
-        const swayX = swayAmount * swayInfluence;
-
-        let undulationX = 0;
-        const hookStrength = Math.max(0, 1 - progress / 0.8);
-        if (hookStrength < 0.5) {
-          const undulationStrength = 1 - hookStrength * 2;
-          const wave1 = Math.sin(t * Math.PI * 2) * undulationAmount * 0.6;
-          const wave2 = Math.sin(t * Math.PI * 4 + Math.PI / 3) * undulationAmount * 0.3;
-          const wave3 = Math.sin(t * Math.PI * 6 + Math.PI / 2) * undulationAmount * 0.1;
-          undulationX = (wave1 + wave2 + wave3) * undulationStrength * t;
+        // 茎の曲線上の位置を取得（centerPointsから補間）
+        const segmentIndex = Math.floor(t * (centerPoints.length - 1));
+        const segmentT = (t * (centerPoints.length - 1)) - segmentIndex;
+        
+        let stemX = seedPos.x;
+        let stemY = seedPos.y;
+        
+        if (segmentIndex >= 0 && segmentIndex < centerPoints.length - 1) {
+          // 2点間を線形補間
+          const p1 = centerPoints[segmentIndex];
+          const p2 = centerPoints[segmentIndex + 1];
+          stemX = p1.x + (p2.x - p1.x) * segmentT;
+          stemY = p1.y + (p2.y - p1.y) * segmentT;
+        } else if (segmentIndex >= 0 && segmentIndex < centerPoints.length) {
+          const p = centerPoints[segmentIndex];
+          stemX = p.x;
+          stemY = p.y;
         }
 
-        leaf.x = seedPos.x + swayX + undulationX;
+        // 葉の位置を茎の曲線上に配置
+        leaf.x = stemX;
+        leaf.y = stemY;
 
         this.updateLeafSway(leaf, pitchChange, time);
         this.drawLeaf(canvas, leaf, pitch, i);
@@ -1060,7 +1130,7 @@ export class Renderer {
 
     // 1. 外側のグロー効果（加算合成）- 常に一定の強度
     this.p.blendMode(this.p.ADD);
-    const glowLayers = 8; // 12から8に減らす
+    const glowLayers = 4; // 8→4に減らして軽量化
     const glowStrength = 0.5; // 控えめな強度で常に表示
     for (let layer = 0; layer < glowLayers; layer++) {
       const t = layer / glowLayers;
@@ -1536,6 +1606,9 @@ export class Renderer {
     // 低音: 細長い（0.7倍）、高音: 丸い（1.3倍）
     const widthRatio = this.lerp(0.7, 1.3, normalizedPitch);
 
+    // 茎上の相対位置を計算（0=根元、1=先端）
+    const stemPositionRatio = stemHeight > 0 ? leafHeight / stemHeight : 0;
+
     return {
       x: seedPos.x + spiralX,
       y: seedPos.y - leafHeight,
@@ -1557,7 +1630,8 @@ export class Renderer {
       isLeft: isLeft, // 左右の判定
       shapeSeed: shapeSeed, // 形状の個体差シード
       birthPitch: pitch, // 生成時の音高
-      widthRatio: widthRatio // 横幅の比率
+      widthRatio: widthRatio, // 横幅の比率
+      stemPositionRatio: stemPositionRatio // 茎上の相対位置（生成時に固定）
     };
   }
 
@@ -1730,7 +1804,21 @@ export class Renderer {
     const seedPos = this.getSeedPosition();
 
     // 茎の先端の揺れを計算（茎と完全に同じロジック）
-    const swayAmount = pitchChange * 0.5; // 茎と同じ
+    let swayAmount = pitchChange * 0.5; // 茎と同じ
+    
+    // 風の揺れを追加（drawSproutと同じロジック）
+    if (volume < 20) {
+      // 音量0-19の範囲で、微妙な風の揺れ
+      const lowVolumeFactor = volume / 20; // 0-1
+      const windSway = Math.sin(time / 800) * 8 * lowVolumeFactor; // ±8の揺れ
+      swayAmount += windSway;
+    } else {
+      // 音量20以上でも風の揺れを追加（より強く）
+      const highVolumeFactor = Math.min(volume / 100, 1); // 0-1
+      const windSway = Math.sin(time / 800) * 12 * highVolumeFactor; // ±12の揺れ
+      swayAmount += windSway;
+    }
+    
     const swayInfluence = 1.0; // 先端なので最大の揺れ
     const stemSwayX = swayAmount * swayInfluence;
 
@@ -1806,12 +1894,12 @@ export class Renderer {
     // 音高に応じた色相の変化（HSBカラーモードを使用）
     const normalizedPitch = this.constrain((pitch - 200) / 600, 0, 1);
 
-    // 満開後の色の移り変わり（ゆっくりと色相が変化）
+    // 満開後の色の移り変わりは無効化（音高のみで色を決定）
     let hueShift = 0;
-    if (bloomProgress >= 1.0) {
-      // 満開後は時間に応じて色相がゆっくり変化（30秒で1周）
-      hueShift = (time / 30000) * 360; // 30秒で360度回転
-    }
+    // if (bloomProgress >= 1.0) {
+    //   // 満開後は時間に応じて色相がゆっくり変化（30秒で1周）
+    //   hueShift = (time / 30000) * 360; // 30秒で360度回転
+    // }
 
     // 音高に応じた基本色相（ピンク〜オレンジ〜黄色）
     // 低音: 330度（ピンク）、高音: 60度（黄色）
@@ -2004,18 +2092,16 @@ export class Renderer {
         }
 
         // HSBで色を計算
-        this.p.colorMode(this.p.HSB, 360, 100, 100);
         const petalHue = (baseHue + layerHueOffset + petalHueOffset) % 360;
         const petalSaturation = 70 - layer * 5; // 外側の層ほど少し彩度を下げる
         const baseBrightness = 90 - layer * 10; // 外層(2)を内層(0)より暗く（90→70）
         const petalBrightness = Math.max(30, Math.min(100, baseBrightness + depthBrightness)); // 前後の明暗差を追加
-        const petalColor = this.p.color(petalHue, petalSaturation, petalBrightness);
-
-        // RGB値を即座に抽出（メモリリーク回避）
-        const petalR = this.p.red(petalColor);
-        const petalG = this.p.green(petalColor);
-        const petalB = this.p.blue(petalColor);
-        this.p.colorMode(this.p.RGB, 255);
+        
+        // RGB値を直接計算（p5.jsの色オブジェクトを使わない）
+        const rgb = this.hsbToRgb(petalHue, petalSaturation, petalBrightness);
+        const petalR = rgb.r;
+        const petalG = rgb.g;
+        const petalB = rgb.b;
 
         // 三角形で花びらのセグメントを描画（中心→点i→点i+1）
         canvas.fill(petalR, petalG, petalB, 25 * layerAlpha * easedProgress);
@@ -2034,9 +2120,14 @@ export class Renderer {
       const outlineSaturation = 60; // 彩度を下げて明るく
       const outlineBrightness = 100; // 最大輝度
       const outlineColor = this.p.color(outlineHue, outlineSaturation, outlineBrightness);
+      
+      // RGB値を即座に抽出（メモリリーク回避）
+      const outlineR = this.p.red(outlineColor);
+      const outlineG = this.p.green(outlineColor);
+      const outlineB = this.p.blue(outlineColor);
       this.p.colorMode(this.p.RGB, 255);
 
-      canvas.stroke(this.p.red(outlineColor), this.p.green(outlineColor), this.p.blue(outlineColor), 200 * layerAlpha * easedProgress * petalAlpha);
+      canvas.stroke(outlineR, outlineG, outlineB, 200 * layerAlpha * easedProgress * petalAlpha);
       canvas.strokeWeight(0.5);
       canvas.noFill();
       canvas.beginShape();
@@ -2196,7 +2287,7 @@ export class Renderer {
     const glowStrength = 0.5;
 
     this.p.blendMode(this.p.ADD);
-    const glowLayers = 8;
+    const glowLayers = 4; // 8→4に減らして軽量化
     for (let layer = 0; layer < glowLayers; layer++) {
       const layerT = layer / glowLayers;
 
@@ -2386,7 +2477,11 @@ export class Renderer {
       hueShift = (time / 30000) * 360;
     }
 
-    const baseHue = this.lerp(330, 60, normalizedPitch) + hueShift;
+    // 色相の変化範囲を狭めてチカチカを抑える（330-60 → 340-40）
+    // スムージングを追加
+    this.targetHue = this.lerp(340, 40, normalizedPitch) + hueShift;
+    this.previousHue += (this.targetHue - this.previousHue) * 0.1; // スムージング係数0.1
+    const baseHue = this.previousHue;
 
     // 音量に応じた輝き
     const volumeFactor = volume / 100;
@@ -2477,7 +2572,7 @@ export class Renderer {
 
       // 1. 外側のグロー効果
       this.p.blendMode(this.p.ADD);
-      const glowLayers = 8;
+      const glowLayers = 4; // 8→4に減らして軽量化
       for (let glowLayer = 0; glowLayer < glowLayers; glowLayer++) {
         const glowT = glowLayer / glowLayers;
         const glowSize = layerSize * (1 + glowT * 1.2);
@@ -2486,13 +2581,15 @@ export class Renderer {
         const glowHue = (baseHue + layerHueOffset) % 360;
         const glowSaturation = 80;
         const glowBrightness = 100;
-        const glowColor = this.p.color(glowHue, glowSaturation, glowBrightness);
+        
+        // RGB値を直接計算（p5.jsの色オブジェクトを使わない）
+        const glowRgb = this.hsbToRgb(glowHue, glowSaturation, glowBrightness);
         this.p.colorMode(this.p.RGB, 255);
 
         const alpha = (1 - glowT * glowT * glowT) * 3 * glowStrength * layerAlpha * easedProgress;
 
         this.p.noFill();
-        this.p.stroke(this.p.red(glowColor), this.p.green(glowColor), this.p.blue(glowColor), alpha);
+        this.p.stroke(glowRgb.r, glowRgb.g, glowRgb.b, alpha);
         this.p.strokeWeight(layerSize * 0.2);
 
         this.p.circle(flowerCenterX, flowerCenterY + depthOffset, glowSize * 2);
@@ -2520,20 +2617,15 @@ export class Renderer {
           depthBrightness = -15 * Math.sin(normalizedAngle - Math.PI);
         }
 
-        this.p.colorMode(this.p.HSB, 360, 100, 100);
         const petalHue = (baseHue + layerHueOffset + petalHueOffset) % 360;
         const petalSaturation = 70 - layer * 5;
         const baseBrightness = 90 - layer * 10;
         const petalBrightness = Math.max(30, Math.min(100, baseBrightness + depthBrightness));
-        const petalColor = this.p.color(petalHue, petalSaturation, petalBrightness);
+        
+        // RGB値を直接計算（p5.jsの色オブジェクトを使わない）
+        const rgb = this.hsbToRgb(petalHue, petalSaturation, petalBrightness);
 
-        // RGB値を即座に抽出（メモリリーク回避）
-        const petalR = this.p.red(petalColor);
-        const petalG = this.p.green(petalColor);
-        const petalB = this.p.blue(petalColor);
-        this.p.colorMode(this.p.RGB, 255);
-
-        this.p.fill(petalR, petalG, petalB, 35 * layerAlpha * easedProgress);
+        this.p.fill(rgb.r, rgb.g, rgb.b, 35 * layerAlpha * easedProgress);
         this.p.noStroke();
         this.p.beginShape();
         this.p.vertex(flowerCenterX, flowerCenterY + depthOffset);
@@ -2553,12 +2645,14 @@ export class Renderer {
         const edgeHue = (baseHue + layerHueOffset) % 360;
         const edgeSaturation = 60;
         const edgeBrightness = 100;
-        const edgeColor = this.p.color(edgeHue, edgeSaturation, edgeBrightness);
+        
+        // RGB値を直接計算（p5.jsの色オブジェクトを使わない）
+        const edgeRgb = this.hsbToRgb(edgeHue, edgeSaturation, edgeBrightness);
         this.p.colorMode(this.p.RGB, 255);
 
         const alpha = (1 - edgeT * edgeT) * 50 * glowStrength * layerAlpha * easedProgress;
 
-        this.p.stroke(this.p.red(edgeColor), this.p.green(edgeColor), this.p.blue(edgeColor), alpha);
+        this.p.stroke(edgeRgb.r, edgeRgb.g, edgeRgb.b, alpha);
         this.p.strokeWeight(thickness);
         this.p.noFill();
 
@@ -2638,13 +2732,13 @@ export class Renderer {
 
         // 茎と葉はbodyLayerに描画
         if (this.bodyLayer) {
-          this.drawSprout(this.bodyLayer, params.progress, params.volume, params.pitch, params.pitchChange, params.reduceGlow, params.stemHeight, params.leaves, time);
+          this.drawSprout(this.bodyLayer, params.progress, params.volume, params.pitch, params.pitchChange, params.reduceGlow, params.stemHeight, params.leaves, time, params.witherAmount || 0);
         }
         break;
       case GrowthState.BLOOM:
         // 茎と葉を描画
         if (this.bodyLayer) {
-          this.drawSprout(this.bodyLayer, 1.0, params.volume, params.pitch, params.pitchChange, false, params.stemHeight, params.leaves, time);
+          this.drawSprout(this.bodyLayer, 1.0, params.volume, params.pitch, params.pitchChange, false, params.stemHeight, params.leaves, time, params.witherAmount || 0);
         }
 
         // 花を描画
@@ -2668,7 +2762,7 @@ export class Renderer {
           // ワイプ完了前は毎フレーム花を描画（アニメーション継続）
           if (scatterProgress < 1.0) {
             // 毎フレーム花を描画
-            this.drawSprout(this.bodyLayer, 1.0, params.volume, params.pitch, params.pitchChange, false, params.stemHeight, params.leaves, time);
+            this.drawSprout(this.bodyLayer, 1.0, params.volume, params.pitch, params.pitchChange, false, params.stemHeight, params.leaves, time, params.witherAmount || 0);
             this.drawBloom(this.bodyLayer, params.stemHeight, params.volume, params.pitch, params.pitchChange, params.leaves, 1.0, time);
 
             // アンビエントグロー（徐々に消す）
@@ -2792,13 +2886,32 @@ export class Renderer {
               // 地面に到達したかチェック（種子のY座標付近、判定を緩和）
               const isOnGround = particle.y >= seedPos.y - 100; // 判定範囲をさらに拡大（-50→-100）
 
+              // 画面上部に溜まっているかチェック（上部20%のエリア）
+              const isAtTop = this.bodyLayer && particle.y < this.bodyLayer.height * 0.2;
+
               // パーティクルの年齢（秒）
               const particleAge = (time - particle.birthTime) / 1000;
 
-              // 画面外に出たか、または一定時間経過したら収束モードに入る
+              // 画面外に出たかチェック
               const isOutOfBounds = particle.y < -100 || particle.y > this.bodyLayer!.height + 100 ||
                                     particle.x < -100 || particle.x > this.bodyLayer!.width + 100;
-              const shouldConverge = isOnGround || distance < 150 || isOutOfBounds || particleAge > 3; // 距離100→150、時間5秒→3秒
+              
+              // 画面外に出たパーティクルを画面内に戻す（バウンド）
+              if (isOutOfBounds) {
+                // 画面の境界内に制限
+                particle.x = Math.max(0, Math.min(this.bodyLayer!.width, particle.x));
+                particle.y = Math.max(0, Math.min(this.bodyLayer!.height, particle.y));
+                
+                // 速度を反転して跳ね返る
+                if (particle.x <= 0 || particle.x >= this.bodyLayer!.width) {
+                  particle.vx *= -0.5;
+                }
+                if (particle.y <= 0 || particle.y >= this.bodyLayer!.height) {
+                  particle.vy *= -0.5;
+                }
+              }
+              
+              const shouldConverge = isOnGround || distance < 150 || isOutOfBounds || particleAge > 3 || isAtTop; // 上部に溜まったら収束
 
               if (shouldConverge) {
                 // 地面に到達または種子に近い：種子に向かって収束
@@ -2867,19 +2980,39 @@ export class Renderer {
                 particle.x += particle.vx;
                 particle.y += particle.vy;
 
+                // 画面端に近づいたら速度を減衰させる（柔らかい制限）
+                if (this.bodyLayer) {
+                  const margin = 50; // 減衰開始位置
+                  const dampingStrength = 0.9; // 減衰率
+                  
+                  // 左右の端
+                  if (particle.x < margin) {
+                    const factor = particle.x / margin;
+                    particle.vx *= factor * dampingStrength;
+                  } else if (particle.x > this.bodyLayer.width - margin) {
+                    const factor = (this.bodyLayer.width - particle.x) / margin;
+                    particle.vx *= factor * dampingStrength;
+                  }
+                  
+                  // 上下の端
+                  if (particle.y < margin) {
+                    const factor = particle.y / margin;
+                    particle.vy *= factor * dampingStrength;
+                  } else if (particle.y > this.bodyLayer.height - margin) {
+                    const factor = (this.bodyLayer.height - particle.y) / margin;
+                    particle.vy *= factor * dampingStrength;
+                  }
+                }
+
                 // 透明度減少
                 particle.alpha -= 0.002;
               }
             }
           }
 
-          // 透明度が0以下または画面外のパーティクルを削除
+          // 透明度が0以下のパーティクルを削除（画面外チェックは削除）
           if (this.bodyLayer) {
-            const validParticles = params.particles.filter(p =>
-              p.alpha > 0 &&
-              p.x > -100 && p.x < this.bodyLayer!.width + 100 &&
-              p.y > -100 && p.y < this.bodyLayer!.height + 100
-            );
+            const validParticles = params.particles.filter(p => p.alpha > 0);
 
             // 配列を完全にクリアしてから再構築
             params.particles.splice(0, params.particles.length, ...validParticles);
@@ -3325,7 +3458,8 @@ export class Renderer {
 
     // 音高に応じた色相
     const normalizedPitch = this.constrain((pitch - 200) / 600, 0, 1);
-    const baseHue = this.lerp(330, 60, normalizedPitch);
+    // 色相の変化範囲を狭めてチカチカを抑える（330-60 → 340-40）
+    const baseHue = this.lerp(340, 40, normalizedPitch);
 
     // 音量に応じた輝き
     const volumeFactor = volume / 100;
@@ -3463,7 +3597,7 @@ export class Renderer {
 
       // 1. 外側のグロー効果（崩れていない部分のみ）
       this.p.blendMode(this.p.ADD);
-      const glowLayers = 8;
+      const glowLayers = 4; // 8→4に減らして軽量化
       for (let glowLayer = 0; glowLayer < glowLayers; glowLayer++) {
         const glowT = glowLayer / glowLayers;
         const glowSize = crumbleRadius * (1 + glowT * 1.2); // 崩れていない部分のサイズ
@@ -3473,12 +3607,17 @@ export class Renderer {
         const glowSaturation = 80;
         const glowBrightness = 100;
         const glowColor = this.p.color(glowHue, glowSaturation, glowBrightness);
+        
+        // RGB値を即座に抽出（メモリリーク回避）
+        const glowR = this.p.red(glowColor);
+        const glowG = this.p.green(glowColor);
+        const glowB = this.p.blue(glowColor);
         this.p.colorMode(this.p.RGB, 255);
 
         const alpha = (1 - glowT * glowT * glowT) * 3 * glowStrength * layerAlpha;
 
         this.p.noFill();
-        this.p.stroke(this.p.red(glowColor), this.p.green(glowColor), this.p.blue(glowColor), alpha);
+        this.p.stroke(glowR, glowG, glowB, alpha);
         this.p.strokeWeight(crumbleRadius * 0.2);
 
         this.p.circle(flowerCenterX, flowerCenterY + depthOffset, glowSize * 2);
@@ -3563,6 +3702,11 @@ export class Renderer {
         const edgeSaturation = 60;
         const edgeBrightness = 100;
         const edgeColor = this.p.color(edgeHue, edgeSaturation, edgeBrightness);
+        
+        // RGB値を即座に抽出（メモリリーク回避）
+        const edgeR = this.p.red(edgeColor);
+        const edgeG = this.p.green(edgeColor);
+        const edgeB = this.p.blue(edgeColor);
         this.p.colorMode(this.p.RGB, 255);
 
         const baseAlpha = (1 - edgeT * edgeT) * 50 * glowStrength * layerAlpha;
@@ -3595,7 +3739,7 @@ export class Renderer {
           const segmentAlpha = baseAlpha * segmentFade;
 
           if (segmentAlpha > 0) {
-            this.p.stroke(this.p.red(edgeColor), this.p.green(edgeColor), this.p.blue(edgeColor), segmentAlpha);
+            this.p.stroke(edgeR, edgeG, edgeB, segmentAlpha);
             this.p.line(point.x, point.y, nextPoint.x, nextPoint.y);
           }
         }
@@ -3661,7 +3805,8 @@ export class Renderer {
 
     // 音高に応じた色相
     const normalizedPitch = this.constrain((pitch - 200) / 600, 0, 1);
-    const baseHue = this.lerp(330, 60, normalizedPitch);
+    // 色相の変化範囲を狭めてチカチカを抑える（330-60 → 340-40）
+    const baseHue = this.lerp(340, 40, normalizedPitch);
 
     // 3層の花びらを点で表現
     const layers = 3;
@@ -4096,5 +4241,41 @@ export class Renderer {
 
     // フレームカウントをリセット
     this.frameCount = 0;
+  }
+
+  /**
+   * HSB色空間からRGB色空間への変換（p5.jsの色オブジェクトを使わない）
+   * @param h 色相（0-360）
+   * @param s 彩度（0-100）
+   * @param b 明度（0-100）
+   * @returns RGB値（0-255）
+   */
+  private hsbToRgb(h: number, s: number, b: number): { r: number; g: number; b: number } {
+    h = h / 360;
+    s = s / 100;
+    b = b / 100;
+
+    const i = Math.floor(h * 6);
+    const f = h * 6 - i;
+    const p = b * (1 - s);
+    const q = b * (1 - f * s);
+    const t = b * (1 - (1 - f) * s);
+
+    let r, g, bl;
+    switch (i % 6) {
+      case 0: r = b; g = t; bl = p; break;
+      case 1: r = q; g = b; bl = p; break;
+      case 2: r = p; g = b; bl = t; break;
+      case 3: r = p; g = q; bl = b; break;
+      case 4: r = t; g = p; bl = b; break;
+      case 5: r = b; g = p; bl = q; break;
+      default: r = g = bl = 0;
+    }
+
+    return {
+      r: Math.round(r * 255),
+      g: Math.round(g * 255),
+      b: Math.round(bl * 255)
+    };
   }
 }

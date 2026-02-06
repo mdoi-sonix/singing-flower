@@ -30,6 +30,7 @@ const sketch = (p: p5) => {
   let previousVolume = 50;
   let previousPitch = 400;
   let previousPitchChange = 0;
+  let smoothedWitherAmount = 0; // 萎れ具合のスムージング用
 
   /**
    * 初期化
@@ -114,6 +115,7 @@ const sketch = (p: p5) => {
           previousVolume = 0;
           previousPitch = 440;
           previousPitchChange = 0;
+          smoothedWitherAmount = 0;
         } else {
           // デモモードON：AudioAnalyzerを停止
           console.log('[Main] デモモードに切り替え、AudioAnalyzer停止中...');
@@ -293,92 +295,138 @@ const sketch = (p: p5) => {
       const additionalGrowth = p.height * additionalScale;
       const totalMaxLength = maxLength + additionalGrowth;
 
-      // 時間条件を削除：茎の高さと葉の開き具合だけで判定
-      if (allLeavesFullyOpen && state.stemHeight >= totalMaxLength) {
-        // BLOOM状態へ遷移（次のフレームでBLOOM状態の処理を行う）
-        state.growthState = GrowthState.BLOOM;
-        // 茎の高さを確実に保存
-        state.stemHeight = totalMaxLength;
-      }
+      // BLOOM状態への遷移条件を取得（音量と音高を先に取得する必要がある）
+      // 音量と音高を取得（デモモードの設定に応じて）
+      let rawVolume: number;
+      let rawPitch: number;
+      let rawPitchChange: number;
 
-      // BLOOM状態に遷移した場合は、SPROUT状態の処理をスキップ
-      if (state.growthState === GrowthState.BLOOM) {
-        // 何もせず、次のelse節でBLOOM状態の処理を行う
+      if (!isDemoMode) {
+        // デモモードOFF：マイク入力を使用
+        rawVolume = audioAnalyzer.getVolume();
+        rawPitch = audioAnalyzer.getPitch() || 440; // ピッチが0の場合は440Hzをデフォルト
+        rawPitchChange = 0; // 音高変化は計算が複雑なので一旦0
+      } else if (!isAutoMode) {
+        // 手動設定モード：スライダーの値を使用
+        rawVolume = manualVolume;
+        rawPitch = manualPitch;
+        rawPitchChange = 0; // 手動設定時は揺れなし
       } else {
-        // SPROUT状態の処理を続行
+        // 自動変化モード：変則的に変化させる
+        const volumeWave1 = Math.sin(time / 1000) * 5; // -5 to +5
+        const volumeWave2 = Math.sin(time / 1700) * 3; // -3 to +3
 
-        // 音量と音高を取得（デモモードの設定に応じて）
-        let rawVolume: number;
-        let rawPitch: number;
-        let rawPitchChange: number;
-
-        if (!isDemoMode) {
-          // デモモードOFF：マイク入力を使用
-          rawVolume = audioAnalyzer.getVolume();
-          rawPitch = audioAnalyzer.getPitch() || 440; // ピッチが0の場合は440Hzをデフォルト
-          rawPitchChange = 0; // 音高変化は計算が複雑なので一旦0
-        } else if (!isAutoMode) {
-          // 手動設定モード：スライダーの値を使用
-          rawVolume = manualVolume;
-          rawPitch = manualPitch;
-          rawPitchChange = 0; // 手動設定時は揺れなし
+        // 自動変化モード：音量を周期的に変化させて成長と萎れをテスト
+        // 15秒サイクル: 7秒間高音量（30-40）→ 8秒間低音量（5-15）
+        const cycle = (time / 1000) % 15;
+        if (cycle < 7) {
+          // 高音量期間：成長＋エネルギー蓄積
+          rawVolume = 35 + volumeWave1 + volumeWave2; // 27-43
         } else {
-          // 自動変化モード：変則的に変化させる
-          const volumeWave1 = Math.sin(time / 1000) * 5; // -5 to +5
-          const volumeWave2 = Math.sin(time / 1700) * 3; // -3 to +3
-
-          // 自動変化モード：変則的に変化させる
-          rawVolume = 25 + volumeWave1 + volumeWave2; // 基準値を25に戻す（自然な成長速度）
-
-          const pitchWave1 = Math.sin(time / 800) * 50; // -50 to +50（100→50にさらに縮小）
-          const pitchWave2 = Math.sin(time / 1300) * 35; // -35 to +35（75→35にさらに縮小）
-          rawPitch = 400 + pitchWave1 + pitchWave2; // テスト用：シンプルな音高変化
-
-          rawPitchChange = Math.sin(time / 500) * 12; // テスト用：シンプルな揺れ
+          // 低音量期間：萎れる（エネルギーは蓄積されない）
+          rawVolume = 10 + volumeWave1 * 0.5 + volumeWave2 * 0.5; // 6-14
         }
 
-        // スムージング（前フレームとの補間で滑らかに）
-        // 慣性のような効果：風がやんでもすぐには止まらない
-        const smoothingFactor = 0.05; // 5%ずつ新しい値に近づける（さらにゆっくり、8%→5%）
-        const volume = previousVolume + (rawVolume - previousVolume) * smoothingFactor;
-        const pitch = previousPitch + (rawPitch - previousPitch) * smoothingFactor;
-        const pitchChange = previousPitchChange + (rawPitchChange - previousPitchChange) * smoothingFactor;
+        const pitchWave1 = Math.sin(time / 800) * 50; // -50 to +50
+        const pitchWave2 = Math.sin(time / 1300) * 35; // -35 to +35
+        rawPitch = 400 + pitchWave1 + pitchWave2;
+
+        rawPitchChange = Math.sin(time / 500) * 12;
+      }
+
+      // スムージング（前フレームとの補間で滑らかに）
+      // 慣性のような効果：風がやんでもすぐには止まらない
+      const smoothingFactor = 0.05; // 5%ずつ新しい値に近づける（さらにゆっくり、8%→5%）
+      const volume = previousVolume + (rawVolume - previousVolume) * smoothingFactor;
+      const pitch = previousPitch + (rawPitch - previousPitch) * smoothingFactor;
+      const pitchChange = previousPitchChange + (rawPitchChange - previousPitchChange) * smoothingFactor;
 
       // 次フレーム用に保存
       previousVolume = volume;
       previousPitch = pitch;
       previousPitchChange = pitchChange;
 
-      // デバッグ用にrawVolumeを保存
-      debugPitchChange = pitchChange;
-      const debugRawVolume = rawVolume;
+      // BLOOM状態への遷移条件：茎の高さ + 葉の開き + 音量が十分 + 完全に直立
+      const VOLUME_THRESHOLD = 20; // 成長に必要な最低音量
+      const WITHER_THRESHOLD = 0.05; // 萎れ具合の閾値（0.05以下=ほぼ完全に直立）
+      const BLOOM_READY_DURATION = 2000; // 開花条件が2秒間継続する必要がある（ミリ秒）
+      
+      const canBloom = allLeavesFullyOpen 
+        && state.stemHeight >= totalMaxLength 
+        && volume >= VOLUME_THRESHOLD
+        && smoothedWitherAmount <= WITHER_THRESHOLD // ほぼ完全に直立している時のみ
+        && state.witherAmount <= WITHER_THRESHOLD; // 生の値も確認（二重チェック）
 
-      // 音量に応じた成長速度（フレーム単位での成長量）
-      const volumeFactor = volume / 100;
-
-      // 成長段階に応じて速度を変える
-
-      // 初期成長（芽）は速く、後期成長（茎）は遅く
-      let baseGrowthRate: number;
-      if (state.stemHeight < maxLength) {
-        baseGrowthRate = 0.25; // 芽の段階：0.5→0.25に減速
+      if (canBloom) {
+        // 開花条件を満たしている：タイマーを開始または継続
+        if (!state.bloomReadyTime) {
+          state.bloomReadyTime = time; // 条件を満たし始めた時刻を記録
+        }
+        
+        // 条件が一定時間（2秒）継続したらBLOOM状態へ遷移
+        const readyDuration = time - state.bloomReadyTime;
+        if (readyDuration >= BLOOM_READY_DURATION) {
+          // BLOOM状態へ遷移（次のフレームでBLOOM状態の処理を行う）
+          state.growthState = GrowthState.BLOOM;
+          // 茎の高さを確実に保存
+          state.stemHeight = totalMaxLength;
+          // 萎れ具合はリセットしない（徐々に回復させる）
+          // state.witherAmount と smoothedWitherAmount はそのまま
+          
+          // このフレームはSPROUT状態として描画を続ける（次のフレームからBLOOM状態）
+          // 何もしない（下のSPROUT処理を実行）
+        }
       } else {
-        baseGrowthRate = 0.15; // 茎の段階：0.3→0.15に減速
+        // 開花条件を満たしていない：タイマーをリセット
+        state.bloomReadyTime = undefined;
       }
 
-      // 音量による成長速度の変化（音量が低いとほぼ成長しない）
-      // 音量0で0倍、音量100で2倍の範囲
-      const growthRate = baseGrowthRate * (volumeFactor * 2.0);
+      // SPROUT状態の処理を続行（canBloomがtrueでも、このフレームは描画する）
+      // 音量と音高は既に上で取得済み
 
-      // 累積的な成長
+      // デバッグ用
+      debugPitchChange = pitchChange;
+
+      // 音量に応じた成長速度（フレーム単位での成長量）
+      // VOLUME_THRESHOLDは上で既に宣言済み
+      const GROWTH_RATE = 0.25; // 基本成長速度
+      const WITHER_RATE = 0.02; // 萎れる速度（0-1の範囲で増加、曲がり具合）
+      const ENERGY_GAIN_RATE = 0.8; // エネルギー獲得速度（音量1あたり）
+
+      // 音量が閾値以上ならエネルギーを蓄積（開花後の鑑賞時間用）
+      if (volume >= VOLUME_THRESHOLD) {
+        const energyGain = (volume - VOLUME_THRESHOLD) * ENERGY_GAIN_RATE;
+        state.totalEnergyCollected += energyGain; // 総エネルギーを記録
+      }
+
+      // 音量に応じて成長または萎れる
+      let actualGrowthRate = 0;
+
+      if (volume >= VOLUME_THRESHOLD) {
+        // 音量が閾値以上なら成長
+        const volumeBonus = (volume - VOLUME_THRESHOLD) / 100; // 0-0.8程度
+        actualGrowthRate = GROWTH_RATE * (1 + volumeBonus); // 音量が高いほど速く成長
+
+        // 元気な状態：萎れ具合を減少（茎が立ち上がる）
+        // 回復速度を遅くして滑らかに（0.02 → 0.008）
+        state.witherAmount = Math.max(0, state.witherAmount - 0.008);
+      } else {
+        // 音量が閾値未満なら萎れる（茎の高さは変えず、曲がり具合を増やす）
+        actualGrowthRate = 0; // 成長しない
+        state.witherAmount = Math.min(1, state.witherAmount + WITHER_RATE); // 萎れ具合を増加
+      }
+
+      // witherAmountにスムージングを適用（カクつき防止）
+      const witherSmoothingFactor = 0.15; // 15%ずつ新しい値に近づける（反応を少し速く）
+      smoothedWitherAmount = smoothedWitherAmount + (state.witherAmount - smoothedWitherAmount) * witherSmoothingFactor;
+
+      // 累積的な成長（茎の高さのみ変化、萎れ具合は別管理）
       if (!state.stemHeight || state.stemHeight === 0) {
         state.stemHeight = 0;
       }
 
-      // 最大長に達していなければ成長を続ける
-      if (state.stemHeight < totalMaxLength) {
-        state.stemHeight = Math.min(state.stemHeight + growthRate, totalMaxLength);
-      }
+      // 成長を適用（0未満にはならない、最大長は超えない）
+      state.stemHeight = Math.max(0, Math.min(state.stemHeight + actualGrowthRate, totalMaxLength));
 
       const sproutLength = state.stemHeight;
       const progress = Math.min(sproutLength / maxLength, 1.0); // 0-1の進行度（芽の段階）
@@ -489,8 +537,9 @@ const sketch = (p: p5) => {
       const maxParticles = 100; // 150→100
 
       // 音量が高い時や揺れが大きい時にパーティクルを放出
+      const volumeFactorForParticles = volume / 100; // パーティクル生成用の音量係数
       if ((volume > 45 || Math.abs(pitchChange) > 30) && state.particles.length < maxParticles) {
-        const particleCount = Math.floor(volumeFactor * 1.5); // 0-1.5個（2→1.5に削減）
+        const particleCount = Math.floor(volumeFactorForParticles * 1.5); // 0-1.5個（2→1.5に削減）
         if (Math.random() < 0.2) { // 20%の確率（30%→20%に削減）
           const newParticles = renderer.generateParticles(
             flowerCenterX,
@@ -524,11 +573,11 @@ const sketch = (p: p5) => {
         leaves: state.leaves,
         particles: state.particles,
         ripples: state.ripples,
-        reduceGlow: reduceGlow // グロー制御フラグを追加
+        reduceGlow: reduceGlow, // グロー制御フラグを追加
+        witherAmount: smoothedWitherAmount // スムージングされた萎れ具合を使用
       };
 
       renderer.render(state.growthState, params, time);
-      } // SPROUT状態の処理終了
 
     } else {
       // BLOOM状態（花が咲く）またはその他の状態
@@ -545,12 +594,21 @@ const sketch = (p: p5) => {
       // 開花アニメーション（時間経過のみを追跡、サイズ制御には使わない）
       // 最初の5秒：ガクのみ成長（0-0.2）
       // 5秒以降：花びら表示（0.2-1.0）
-      // 合計30秒間花を表示してからSCATTER状態に遷移
+      // 蓄積エネルギーに応じた時間花を表示してからSCATTER状態に遷移
       if (state.bloomProgressRaw === undefined || state.bloomProgressRaw === 0) {
         state.bloomProgressRaw = 0;
       }
 
-      const bloomDuration = 10; // 10秒間花を表示
+      // 鑑賞時間を蓄積エネルギーから計算
+      // 最低5秒、最大30秒、エネルギー1000で10秒、2000で20秒、3000以上で30秒
+      const minBloomDuration = 5;
+      const maxBloomDuration = 30;
+      const energyForMaxDuration = 3000;
+      const bloomDuration = Math.min(
+        maxBloomDuration,
+        minBloomDuration + (state.totalEnergyCollected / energyForMaxDuration) * (maxBloomDuration - minBloomDuration)
+      );
+
       const bloomSpeed = 1 / (bloomDuration * 60); // 60fps想定
 
       if (state.bloomProgressRaw < 1) {
@@ -576,11 +634,17 @@ const sketch = (p: p5) => {
         rawBloomVolume = audioAnalyzer.getVolume();
         rawBloomPitch = audioAnalyzer.getPitch() || 440;
         bloomPitchChange = 0;
+        
+        // BLOOM状態では音量の下限を設定（色の安定化）
+        rawBloomVolume = Math.max(25, rawBloomVolume); // 最低25
       } else if (!isAutoMode) {
         // 手動設定モード：スライダーの値を使用
         rawBloomVolume = manualVolume;
         rawBloomPitch = manualPitch;
         bloomPitchChange = 0; // 手動設定時は揺れなし
+        
+        // BLOOM状態では音量の下限を設定（色の安定化）
+        rawBloomVolume = Math.max(25, rawBloomVolume); // 最低25
       } else {
         // 自動変化モード
         // SPROUT状態の最後の値（調整後の変則的なパターンを維持）
@@ -635,7 +699,8 @@ const sketch = (p: p5) => {
       }
 
       // スムージング適用後の値で遷移（慣性効果を維持）
-      const smoothingFactor = 0.05; // SPROUT状態と同じ係数
+      // BLOOM状態では色の変化を抑えるため、スムージングを強化（0.05 → 0.02）
+      const smoothingFactor = 0.02; // より滑らかに
 
       // SPROUT状態の最後の値（手動設定モードの場合も考慮）
       let smoothedSproutVolume: number;
@@ -676,9 +741,12 @@ const sketch = (p: p5) => {
       const smoothedBloomPitchChange = previousPitchChange + (bloomPitchChange - previousPitchChange) * smoothingFactor;
 
       // 徐々に遷移
-      const volume = smoothedSproutVolume * (1 - eased) + smoothedBloomVolume * eased;
+      let volume = smoothedSproutVolume * (1 - eased) + smoothedBloomVolume * eased;
       const pitch = smoothedSproutPitch * (1 - eased) + smoothedBloomPitch * eased;
       const pitchChange = smoothedSproutPitchChange * (1 - eased) + smoothedBloomPitchChange * eased;
+
+      // BLOOM状態では最終的な音量にも下限を適用（色の安定化）
+      volume = Math.max(30, volume); // 最低30（より安定した色）
 
       // 次フレーム用に保存
       previousVolume = volume;
@@ -687,6 +755,14 @@ const sketch = (p: p5) => {
 
       // 茎の高さはSPROUT状態で到達した値を保持（強制的に伸ばさない）
       // state.stemHeightはそのまま維持
+
+      // BLOOM状態では萎れない（常に元気な状態を保つ）
+      // 開花した後は萎れ具合を徐々に0に戻す（回復のみ）
+      state.witherAmount = Math.max(0, state.witherAmount - 0.01); // 回復のみ
+      
+      // witherAmountにスムージングを適用
+      const witherSmoothingFactor = 0.15;
+      smoothedWitherAmount = smoothedWitherAmount + (state.witherAmount - smoothedWitherAmount) * witherSmoothingFactor;
 
       // 葉の更新（3段階の成長アニメーション + 震え）
       // 下の葉から順番に開くように、葉のインデックスに応じて展開開始を遅らせる
@@ -871,7 +947,8 @@ const sketch = (p: p5) => {
         stemHeight: state.stemHeight,
         leaves: state.leaves,
         particles: state.particles,
-        ripples: state.ripples
+        ripples: state.ripples,
+        witherAmount: smoothedWitherAmount // 萎れ具合を追加（BLOOM状態でも茎が動くように）
       };
 
       // 通常描画
@@ -988,6 +1065,11 @@ const sketch = (p: p5) => {
         // 累積音量をリセット
         state.accumulatedVolume = 0;
         state.volumeSampleCount = 0;
+
+        // 成長エネルギーをリセット
+        state.growthEnergy = 0;
+        state.totalEnergyCollected = 0;
+        state.witherAmount = 0; // 萎れ具合もリセット
 
         // パーティクルをクリア（種子はRenderer側で描画）
         state.particles.length = 0;
@@ -1200,33 +1282,34 @@ const sketch = (p: p5) => {
         const heightScale = isPortrait ? 0.25 : 0.35;
         const maxLength = p.height * heightScale;
 
-        let baseGrowthRate: number;
-        if (state.stemHeight < maxLength) {
-          baseGrowthRate = 0.5; // 芽の段階：速い
-        } else {
-          baseGrowthRate = 0.3; // 茎の段階：遅い
-        }
-
-        const growthRate = baseGrowthRate * (0.3 + volumeFactor * 1.4);
-        const growthSpeedPercent = (growthRate / baseGrowthRate) * 100;
-
         const yOffset = isDemoMode ? 90 : 110; // マイク入力モードの場合は下にずらす
 
-        // 成長速度を色分けして表示
-        if (growthSpeedPercent > 100) {
-          p.fill(0, 255, 0); // 緑色（速い）
-        } else if (growthSpeedPercent > 60) {
-          p.fill(255, 255, 0); // 黄色（普通）
-        } else {
-          p.fill(255, 100, 0); // オレンジ色（遅い）
+        // エネルギー情報を表示
+        p.fill(100, 200, 255); // 水色
+        p.text(`蓄積エネルギー: ${state.totalEnergyCollected.toFixed(0)} (開花後の鑑賞時間用)`, 10, yOffset);
+
+        // 萎れ具合を表示
+        const witherPercent = state.witherAmount * 100;
+        if (witherPercent > 0) {
+          p.fill(255, 150, 0); // オレンジ色
+          p.text(`萎れ具合: ${witherPercent.toFixed(0)}% (U字型に曲がる)`, 10, yOffset + 20);
         }
-        p.text(`成長速度: ${growthSpeedPercent.toFixed(0)}% (音量${displayVolume.toFixed(0)}で決定)`, 10, yOffset);
+
+        // 成長状態を表示
+        const VOLUME_THRESHOLD = 20;
+        if (displayVolume >= VOLUME_THRESHOLD) {
+          p.fill(0, 255, 0); // 緑色（成長中）
+          p.text(`✓ 成長中 (音量${displayVolume.toFixed(0)} ≥ ${VOLUME_THRESHOLD})`, 10, yOffset + 40);
+        } else {
+          p.fill(255, 100, 0); // オレンジ色（萎れ中）
+          p.text(`↓ 萎れ中 (音量${displayVolume.toFixed(0)} < ${VOLUME_THRESHOLD})`, 10, yOffset + 40);
+        }
         p.fill(255); // 白に戻す
 
         // 茎の高さと進行度を表示
         const totalMaxLength = maxLength + p.height * (isPortrait ? 0.1 : 0.15);
         const heightPercent = (state.stemHeight / totalMaxLength) * 100;
-        p.text(`茎の高さ: ${heightPercent.toFixed(0)}%`, 10, yOffset + 20);
+        p.text(`茎の高さ: ${heightPercent.toFixed(0)}%`, 10, yOffset + 60);
       }
 
       // SCATTER状態の場合は追加情報を表示
@@ -1255,8 +1338,21 @@ const sketch = (p: p5) => {
       } else if (state.growthState === GrowthState.BLOOM) {
         // BLOOM状態の場合は開花進行度を表示
         const bloomPercent = state.bloomProgress * 100;
+
+        // 鑑賞時間を計算（表示用）
+        const minBloomDuration = 5;
+        const maxBloomDuration = 30;
+        const energyForMaxDuration = 3000;
+        const bloomDuration = Math.min(
+          maxBloomDuration,
+          minBloomDuration + (state.totalEnergyCollected / energyForMaxDuration) * (maxBloomDuration - minBloomDuration)
+        );
+
         p.text(`開花進行度: ${bloomPercent.toFixed(0)}%`, 10, 90);
-        p.text(`Leaves: ${state.leaves.length}`, 10, 110);
+        p.fill(100, 200, 255); // 水色
+        p.text(`鑑賞時間: ${bloomDuration.toFixed(1)}秒 (エネルギー: ${state.totalEnergyCollected.toFixed(0)})`, 10, 110);
+        p.fill(255); // 白に戻す
+        p.text(`Leaves: ${state.leaves.length}`, 10, 130);
       }
     }
 
@@ -1284,6 +1380,9 @@ const sketch = (p: p5) => {
       state.leaves = [];
       state.stemHeight = 0;
       state.sproutMaxLength = undefined;
+      state.growthEnergy = 0;
+      state.totalEnergyCollected = 0;
+      state.witherAmount = 0;
     }
   };
 
@@ -1309,7 +1408,10 @@ const sketch = (p: p5) => {
       lastUpdateTime: Date.now(),
       accumulatedVolume: 0,
       volumeSampleCount: 0,
-      seedResetTime: -1 // 初回は種子を表示（-1に設定）
+      seedResetTime: -1, // 初回は種子を表示（-1に設定）
+      growthEnergy: 0, // 成長エネルギー初期値
+      totalEnergyCollected: 0, // 総エネルギー初期値
+      witherAmount: 0 // 萎れ具合初期値（0=元気）
     };
   }
 };

@@ -53,6 +53,7 @@ export interface Leaf {
   shapeSeed: number;        // 形状の個体差シード（0-1）
   birthPitch: number;       // 生成時の音高（Hz）
   widthRatio: number;       // 横幅の比率（0.7-1.3、生成時のピッチで決定）
+  stemPositionRatio: number; // 茎上の相対位置（0=根元、1=先端）- 生成時に固定
 }
 
 /**
@@ -131,6 +132,11 @@ export interface AppState {
   accumulatedVolume: number;    // SCATTER中の累積音量（崩れる速度の計算用）
   volumeSampleCount: number;    // 音量サンプル数
   seedResetTime?: number;       // SEED状態に戻った時刻（ミリ秒）
+  bloomReadyTime?: number;      // 開花準備が整った時刻（ミリ秒、条件継続確認用）
+  // 新しい成長エネルギーシステム
+  growthEnergy: number;         // 成長エネルギー（音量を蓄積）
+  totalEnergyCollected: number; // 開花までに集めた総エネルギー（鑑賞時間の計算用）
+  witherAmount: number;         // 萎れ具合（0-1、0=元気、1=完全に萎れてU字型）
 }
 
 /**
@@ -155,6 +161,7 @@ export interface RenderParameters {
   scanY?: number;             // 崩壊ライン（画面上部から下部へ移動）
   seedAlpha?: number;         // 種子の透明度（0-1、収束に応じて増加）
   rippleAlphaMultiplier?: number; // 波紋の透明度係数（0-1、収束に応じて減少）
+  witherAmount?: number;      // 萎れ具合（0-1、0=元気、1=完全に萎れてU字型）
 }
 
 /**
