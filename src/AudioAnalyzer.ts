@@ -140,12 +140,12 @@ export class AudioAnalyzer {
 
     // デシベルに変換（0-100の範囲にスケール）
     // 小さい音も拾いやすくするため、感度を上げる
-    const db = 20 * Math.log10(rms + 0.0001);
+    const db = 25 * Math.log10(rms + 0.0001);
     // -60dB〜0dBを0〜100にマッピング（感度を上げるため範囲を調整）
     const volume = Math.max(0, Math.min(100, (db + 60) * (100 / 60)));
 
-    // 感度を適度に上げるため、音量を増幅（2.0倍に減少）
-    const amplifiedVolume = Math.min(100, volume * 2.0);
+    // 感度を適度に上げるため、音量を増幅（1.5倍に調整）
+    const amplifiedVolume = Math.min(100, volume * 1.2);
 
     // デバッグ用：常にログ出力（頻繁に）
     if (Math.random() < 0.05) { // 5%の確率でログ出力

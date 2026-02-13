@@ -1901,9 +1901,9 @@ export class Renderer {
     //   hueShift = (time / 30000) * 360; // 30秒で360度回転
     // }
 
-    // 音高に応じた基本色相（ピンク〜オレンジ〜黄色）
-    // 低音: 330度（ピンク）、高音: 60度（黄色）
-    this.targetHue = this.lerp(330, 60, normalizedPitch) + hueShift;
+    // 音高に応じた基本色相（温かい〜冷たい）
+    // 低音: 10度（赤オレンジ、温かい）、高音: 260度（青紫、冷たい）
+    this.targetHue = this.lerp(10, 260, normalizedPitch) + hueShift;
 
     // 色相をスムージング（急激な変化を防ぐ）
     const hueSmoothingFactor = 0.005; // さらにゆっくり（0.01→0.005）
