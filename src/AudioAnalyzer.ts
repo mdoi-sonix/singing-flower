@@ -146,13 +146,20 @@ export class AudioAnalyzer {
 
     // 感度を適度に上げるため、音量を増幅（1.5倍に調整）
     const amplifiedVolume = Math.min(100, volume * 1.2);
+    
+    // ノイズフロアを差し引く（静かな時の音量を0に近づける）
+    const NOISE_FLOOR = 25; // ノイズフロアの閾値
+    const adjustedVolume = Math.max(0, amplifiedVolume - NOISE_FLOOR);
+    
+    // 0-100の範囲に再スケール
+    const finalVolume = Math.min(100, adjustedVolume * (100 / (100 - NOISE_FLOOR)));
 
     // デバッグ用：常にログ出力（頻繁に）
     if (Math.random() < 0.05) { // 5%の確率でログ出力
-      console.log(`[AudioAnalyzer] RMS: ${rms.toFixed(4)}, dB: ${db.toFixed(1)}, Volume: ${volume.toFixed(1)}, Amplified: ${amplifiedVolume.toFixed(1)}`);
+      console.log(`[AudioAnalyzer] RMS: ${rms.toFixed(4)}, dB: ${db.toFixed(1)}, Volume: ${volume.toFixed(1)}, Amplified: ${amplifiedVolume.toFixed(1)}, Final: ${finalVolume.toFixed(1)}`);
     }
 
-    return amplifiedVolume;
+    return finalVolume;
   }
 
   /**
