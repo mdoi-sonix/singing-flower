@@ -1905,8 +1905,8 @@ export class Renderer {
     // 低音: 10度（赤オレンジ、温かい）、高音: 260度（青紫、冷たい）
     this.targetHue = this.lerp(10, 260, normalizedPitch) + hueShift;
 
-    // 色相をスムージング（急激な変化を防ぐ）
-    const hueSmoothingFactor = 0.005; // さらにゆっくり（0.01→0.005）
+    // 色相をスムージング（チラつかない程度に速く）
+    const hueSmoothingFactor = 0.02; // 2%ずつ変化（0.005→0.02で4倍速く）
     // 色相は円環なので、最短経路で補間
     let hueDiff = this.targetHue - this.previousHue;
     if (hueDiff > 180) hueDiff -= 360;

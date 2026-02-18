@@ -148,7 +148,7 @@ export class AudioAnalyzer {
     const amplifiedVolume = Math.min(100, volume * 1.2);
     
     // ノイズフロアを差し引く（静かな時の音量を0に近づける）
-    const NOISE_FLOOR = 25; // ノイズフロアの閾値
+    const NOISE_FLOOR = 15; // ノイズフロアの閾値（25→15に調整）
     const adjustedVolume = Math.max(0, amplifiedVolume - NOISE_FLOOR);
     
     // 0-100の範囲に再スケール
